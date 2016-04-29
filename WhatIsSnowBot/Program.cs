@@ -27,9 +27,22 @@ namespace WhatIsSnowBot
         public static TimeSpan RoundDuration = new TimeSpan(11, 59, 0);
         private static readonly TimeSpan OneHour = new TimeSpan(1,0,0);
 
+        private static Random rand = new Random();
+
         static void Main(string[] args)
         {
-            service = new TwitterService(CLIENT_ID, CLIENT_SECRET);
+            var AppInfo = new {
+                CLIENT_ID = Environment.GetEnvironmentVariable("CLIENT_ID"),
+                CLIENT_SECRET = Environment.GetEnvironmentVariable("CLIENT_SECRET")
+            };
+
+            if (File.Exists("AppAuth.json"))
+            {
+                JsonConvert.DeserializeAnonymousType(File.ReadAllText("AppAuth.json"), AppInfo);
+            }
+
+
+            service = new TwitterService(AppInfo.CLIENT_ID, AppInfo.CLIENT_SECRET);
             access = null;
             if (File.Exists("token.json"))
             {
@@ -173,13 +186,13 @@ namespace WhatIsSnowBot
             var PointsA = await CountPoints(A);
             var PointsB = await CountPoints(B);
 //TODO: Vary tweets.
-//TODO: Add tenses.
+//TODO: (Will be difficult) Add tenses.
             if (PointsA == PointsB)
             {
                 CurrentBout.Winner = -2;
                 var status = $"Was Snow {A.Text.Split(' ').Last()}, or {B.Text.Split(' ').Last()}? We just don't know";
                 Console.WriteLine(status);
-                service.SendTweet(new SendTweetOptions() { InReplyToStatusId = CurrentBout.Announcement, Status = status });
+                service.SendTweet(new SendTweetOptions() { /*InReplyToStatusId = CurrentBout.Announcement,*/ Status = status });
                 //RoundDuration = RoundDuration.Add(new TimeSpan(0,5,0));
             }
             else if (PointsA > PointsB)
@@ -269,6 +282,7 @@ namespace WhatIsSnowBot
             var Eliminated = History.Select(m => m.Winner == -2 ? -2 : m.Winner == m.A ? m.B : m.A).Where(m => m != -2).ToArray();
             AvailableTweets = AllTweets.Where(t => !Eliminated.Contains(t.Id)).ToArray();
             Dictionary<int, List<TwitterStatus>> Rounds = new Dictionary<int, List<TwitterStatus>>();
+            AvailableTweets = AvailableTweets.OrderBy(t => t.RetweetCount * 100 + rand.Next(0,99)).ToArray();
             foreach (var item in AvailableTweets)
             {
                 var r = History.Count(m => m.A == item.Id || m.B == item.Id);
@@ -297,15 +311,15 @@ namespace WhatIsSnowBot
             {
                 if (Rounds.ContainsKey(i))
                 {
-                    Rounds[i].OrderBy(t => t.RetweetCount);
-                    //TODO: More randomness.
-                    CurrentBout = new Match(A: Rounds[i].First().Id, B: Rounds[i].Last().Id); 
+                    //Rounds[i].OrderBy(t => t.RetweetCount);
+                    CurrentBout = new Match(
+                        A: Rounds[i].FirstOrDefault(t => DateTime.Now.Subtract(t.CreatedDate).TotalHours > 12).Id, 
+                        B: Rounds[i].Last().Id);
                     History.Add(CurrentBout);
                     return;
                 }
                 i++;
             }
-            AvailableTweets.OrderBy(t => t.RetweetCount);
         }
     }
 }
