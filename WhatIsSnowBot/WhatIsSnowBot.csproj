@@ -62,7 +62,6 @@
   <ItemGroup>
     <Compile Include="Match.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="Program.Keys.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
