@@ -38,7 +38,11 @@ namespace WhatIsSnowBot
 
             if (File.Exists("AppAuth.json"))
             {
-                JsonConvert.DeserializeAnonymousType(File.ReadAllText("AppAuth.json"), AppInfo);
+               AppInfo = JsonConvert.DeserializeAnonymousType(File.ReadAllText("AppAuth.json"), AppInfo);
+            }
+            else
+            {
+                File.WriteAllText("AppAuth.json", JsonConvert.SerializeObject(AppInfo));
             }
 
 
@@ -85,6 +89,7 @@ namespace WhatIsSnowBot
                 .OrderBy(t => t.Id)
                 .ToArray();
             LoadRoundTimerFromDisk();
+            Save();
         NextRound:
             Refresh();
             if (CurrentBout.Announcement == -1)
@@ -291,12 +296,15 @@ namespace WhatIsSnowBot
                 Rounds[r].Add(item);
             }
 
+            var duration = Time.LargestIntervalWithUnits(new TimeSpan(Rounds[Rounds.Keys.Min()].Count * RoundDuration.Ticks / 2));
+            var description = "Trying to definitively define @SnowMcNally, @EverywordCup style. ☆ " +
+                "Bot by @Silasary ☆ " + 
+                $"Round {Rounds.Keys.Min() + 1} might complete in {duration} ☆ " +
+                $"New Matchup every {RoundDuration.TotalHours.ToString("N0")} Hours";
+            Console.WriteLine(description);
             service.UpdateProfile(new UpdateProfileOptions()
             {
-                Description = "Trying to definitively define @SnowMcNally, @EverywordCup style. ☆ " +
-                "Bot by @Silasary ☆ " + 
-                $"Round {Rounds.Keys.Min() + 1} might complete in {(Rounds[Rounds.Keys.Min()].Count * RoundDuration.TotalDays / 2).ToString("N1")} days ☆ " +
-                $"New Matchup every {RoundDuration.TotalHours.ToString("N0")} Hours"
+                Description = description
             });
             
             if (History.Count > 0 && History.Last().Winner == -1)
