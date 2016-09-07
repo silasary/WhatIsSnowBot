@@ -40,11 +40,30 @@ namespace WhatIsSnowBot
             {
                AppInfo = JsonConvert.DeserializeAnonymousType(File.ReadAllText("AppAuth.json"), AppInfo);
             }
-            else
+
+            if (AppInfo.CLIENT_ID == null || AppInfo.CLIENT_SECRET == null)
             {
+                string id = AppInfo.CLIENT_ID;
+                if (AppInfo.CLIENT_ID == null)
+                {
+                    Console.Write("AppID: ");
+                    id = Console.ReadLine();
+                }
+
+                string secret = AppInfo.CLIENT_SECRET;
+                if (AppInfo.CLIENT_SECRET == null)
+                {
+                    Console.Write("Secret: ");
+                    secret = Console.ReadLine();
+                }
+
+                AppInfo = new
+                {
+                    CLIENT_ID = id,
+                    CLIENT_SECRET = secret
+                };
                 File.WriteAllText("AppAuth.json", JsonConvert.SerializeObject(AppInfo));
             }
-
 
             service = new TwitterService(AppInfo.CLIENT_ID, AppInfo.CLIENT_SECRET);
             access = null;
