@@ -26,6 +26,7 @@ namespace WhatIsSnowBot
 
         public static TimeSpan RoundDuration = new TimeSpan(11, 59, 0);
         private static readonly TimeSpan OneHour = new TimeSpan(1,0,0);
+        private static readonly TimeSpan OneMinute = new TimeSpan(0,1,0);
 
         private static Random rand = new Random();
 
@@ -123,9 +124,9 @@ namespace WhatIsSnowBot
                 Console.WriteLine($"> {Announcement.Text}");
             }
             var age = DateTime.UtcNow.Subtract(Announcement.CreatedDate);
-            while (age.TotalSeconds < RoundDuration.TotalSeconds)
+            while (age.TotalSeconds < (RoundDuration.TotalSeconds - 60))
             {
-                var diff = RoundDuration.Subtract(age);
+                var diff = RoundDuration.Subtract(age).Subtract(OneMinute);
                 if (diff.TotalHours > 1)
                 {
                     Console.WriteLine($" Sleeping 1 hour of {diff.TotalHours}");
@@ -145,7 +146,11 @@ namespace WhatIsSnowBot
             CalcWinner();
             Save();
 
-            Thread.Sleep(new TimeSpan(0, 1, 0));
+            Thread.Sleep(OneMinute);
+            if (RoundDuration.TotalMinutes >= 60 && DateTime.Now.Minute != 0)
+            {
+                Thread.Sleep(OneMinute);
+            }
 
             //Debugger.Break();
             goto NextRound;
