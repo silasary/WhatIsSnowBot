@@ -15,6 +15,8 @@ namespace WhatIsSnowBot
         public long Announcement = -1;
         public long Winner = -1;
 
+        public long LastRecounted = 0;
+
         public Match(long A, long B)
         {
             this.A = A;

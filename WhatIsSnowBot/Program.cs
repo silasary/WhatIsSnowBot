@@ -13,7 +13,7 @@ using TweetSharp;
 
 namespace WhatIsSnowBot
 {
-    partial class Program
+    static class Program
     {
         private static TwitterService service;
         private static OAuthAccessToken access;
@@ -29,6 +29,7 @@ namespace WhatIsSnowBot
         private static readonly TimeSpan OneMinute = new TimeSpan(0,1,0);
 
         private static Random rand = new Random();
+        public static DateTime LastRecount;
 
         static void Main(string[] args)
         {
@@ -121,12 +122,19 @@ namespace WhatIsSnowBot
             if (Announcement == null)
             {
                 Announcement = service.GetTweet(new GetTweetOptions() { Id = CurrentBout.Announcement });
+                if (Announcement == null)
+                {
+                    Announce();
+                    Announcement = service.GetTweet(new GetTweetOptions() { Id = CurrentBout.Announcement });
+                }
                 Console.WriteLine($"> {Announcement.Text}");
             }
             var age = DateTime.UtcNow.Subtract(Announcement.CreatedDate);
-            while (age.TotalSeconds < (RoundDuration.TotalSeconds - 60))
+            var TimeBetweenRounds = OneMinute; //new TimeSpan(RoundDuration.Ticks / 10);
+
+            while (age.TotalSeconds < (RoundDuration.TotalSeconds - TimeBetweenRounds.TotalSeconds))
             {
-                var diff = RoundDuration.Subtract(age).Subtract(OneMinute);
+                var diff = RoundDuration.Subtract(age).Subtract(TimeBetweenRounds);
                 if (diff.TotalHours > 1)
                 {
                     Console.WriteLine($" Sleeping 1 hour of {diff.TotalHours}");
@@ -146,14 +154,47 @@ namespace WhatIsSnowBot
             CalcWinner();
             Save();
 
-            Thread.Sleep(OneMinute);
+
+            Console.WriteLine($" Sleeping {TimeBetweenRounds.ToString()}");
+            Thread.Sleep(TimeBetweenRounds);
+            if (DateTime.Now.Subtract(LastRecount).TotalHours > 12)
+            {
+                Recount();
+                LastRecount = DateTime.Now;
+            }
             if (RoundDuration.TotalMinutes >= 60 && DateTime.Now.Minute != 0)
             {
+                Console.WriteLine($" Sleeping {OneMinute.ToString()}");
                 Thread.Sleep(OneMinute);
             }
 
-            //Debugger.Break();
             goto NextRound;
+        }
+
+        private static async void Recount()
+        {
+            var match = History.Where(n => n.Winner == -2).OrderBy(n => n.LastRecounted).First();
+
+            var PointsA = CountPoints(match.A);
+            var PointsB = CountPoints(match.B);
+
+            long winner = -1;
+            if (await PointsA > await PointsB)
+            {
+                winner = match.A;
+            }
+            else if (await PointsB > await PointsA)
+            {
+                winner = match.B;
+            }
+
+            if (winner > 0)
+            {
+                match.Winner = winner;
+                var status = $"Afer receiving a late vote, we've recounted, and found that Snow is {Lookup(winner).Text.Split(' ').Last()}!";
+                Console.WriteLine(status);
+                service.SendTweet(new SendTweetOptions() { InReplyToStatusId = match.Announcement, Status = status });
+            }
         }
 
         private static void LoadRoundTimerFromDisk()
@@ -206,38 +247,33 @@ namespace WhatIsSnowBot
 
         private static async void CalcWinner()
         {
+            var PointsA = CountPoints(CurrentBout.A);
+            var PointsB = CountPoints(CurrentBout.B);
 
-            Lookup(CurrentBout.A, CurrentBout.B);
-            var A = AllTweets.Single(t => t.Id == CurrentBout.A);
-            var B = AllTweets.Single(t => t.Id == CurrentBout.B);
-
-
-            var PointsA = await CountPoints(A);
-            var PointsB = await CountPoints(B);
+            long winner = -1;
 //TODO: Vary tweets.
 //TODO: (Will be difficult) Add tenses.
-            if (PointsA == PointsB)
+            if (await PointsA > await PointsB)
+            {
+                winner = CurrentBout.A;
+            }
+            else if (await PointsA < await PointsB)
+            {
+                winner = CurrentBout.B;
+            }
+
+            if (winner == -1)
             {
                 CurrentBout.Winner = -2;
-                var status = $"Was Snow {A.Text.Split(' ').Last()}, or {B.Text.Split(' ').Last()}? We just don't know";
+                var status = $"Was Snow {Lookup(CurrentBout.A).Text.Split(' ').Last()}, or {Lookup(CurrentBout.B).Text.Split(' ').Last()}? We just don't know";
                 Console.WriteLine(status);
-                service.SendTweet(new SendTweetOptions() { /*InReplyToStatusId = CurrentBout.Announcement,*/ Status = status });
+                service.SendTweet(new SendTweetOptions() { /* InReplyToStatusId = CurrentBout.Announcement, */ Status = status });
                 //RoundDuration = RoundDuration.Add(new TimeSpan(0,5,0));
             }
-            else if (PointsA > PointsB)
+            else
             {
-                CurrentBout.Winner = A.Id;
-                var status = $"We have a consensus!  Snow is definitely {A.Text.Split(' ').Last()}!";
-                Console.WriteLine(status);
-                service.SendTweet(new SendTweetOptions() { InReplyToStatusId = CurrentBout.Announcement, Status = status });
-                //service.FavoriteTweet(new FavoriteTweetOptions() { Id = A.Id });
-                //if (RoundDuration > TenMinutes)
-                //    RoundDuration = RoundDuration.Subtract(new TimeSpan(0, 1, 0));
-            }
-            else if (PointsA < PointsB)
-            {
-                CurrentBout.Winner = B.Id;
-                var status = $"We have a consensus!  Snow is definitely {B.Text.Split(' ').Last()}!";
+                CurrentBout.Winner = winner;
+                var status = $"We have a consensus!  Snow is definitely {Lookup(winner).Text.Split(' ').Last()}!";
                 Console.WriteLine(status);
                 service.SendTweet(new SendTweetOptions() { InReplyToStatusId = CurrentBout.Announcement, Status = status });
                 //service.FavoriteTweet(new FavoriteTweetOptions() { Id = B.Id });
@@ -246,9 +282,10 @@ namespace WhatIsSnowBot
             }
         }
 
-        private static async Task<int> CountPoints(TwitterStatus b)
+        private static async Task<int> CountPoints(long tweetId)
         {
-            return b.FavoriteCount + b.RetweetCount;
+            var tweet = await LookupAsync(tweetId);
+            return tweet.FavoriteCount + tweet.RetweetCount;
 
             //int i = b.FavoriteCount;
             //var Retweets = service.Retweets(new RetweetsOptions() { Id = b.Id, Count = 100, TrimUser = false });
@@ -261,15 +298,28 @@ namespace WhatIsSnowBot
             //return i;
         }
 
-        private static List<TwitterStatus> Lookup(params long[] Ids)
+        private static TwitterStatus Lookup(long id)
         {
-            List<TwitterStatus> res = new List<TwitterStatus>();
-            foreach (var item in Ids)
+            var lookup = LookupAsync(id);
+            lookup.Wait();
+            return lookup.Result;
+        }
+
+        private static async Task<TwitterStatus> LookupAsync(long Id)
+        {
+            var tweet = AllTweets.SingleOrDefault(t => t.Id == CurrentBout.A);
+
+            if (tweet == null || DateTime.Now.Subtract(tweet.RetrievedAt).TotalMinutes > 5)
             {
-                 res.Add(service.GetTweet(new GetTweetOptions() { Id = item, TrimUser = true }));
+                var newtweet = await service.GetTweetAsync(new GetTweetOptions() { Id = Id, TrimUser = true });
+
+                if (newtweet.Response.Error == null)
+                {
+                    AllTweets = new TwitterStatus[] { tweet = newtweet.Value }.Union(AllTweets).ToArray();
+                }
             }
-            AllTweets = res.Union(AllTweets).ToArray();
-            return res;
+
+            return tweet;
         }
 
         private static void Save()
