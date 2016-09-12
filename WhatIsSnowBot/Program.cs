@@ -30,6 +30,8 @@ namespace WhatIsSnowBot
 
         private static Random rand = new Random();
         public static DateTime LastRecount;
+        private static long LatestRetrievedTweetThisSession = -1;
+        
 
         static void Main(string[] args)
         {
@@ -105,8 +107,7 @@ namespace WhatIsSnowBot
                 History.AddRange(matches);
             }
 
-            var tweets = GetTweets();
-            AllTweets = tweets.Union(AllTweets)
+            AllTweets = GetTweets().Union(AllTweets)
                 .OrderBy(t => t.Id)
                 .ToArray();
             LoadRoundTimerFromDisk();
@@ -214,14 +215,9 @@ namespace WhatIsSnowBot
 
         private static IEnumerable<TwitterStatus> GetTweets()
         {
-            //var AsyncResp = service.ListTweetsOnUserTimeline(
-            //    new ListTweetsOnUserTimelineOptions() { ScreenName = "SnowIsEveryword", Count = 1000, TrimUser = true }, 
-            //    (tweets, resp) =>
-            //    {
-
-            //    });
             if (AllTweets.Any())
             {
+                // Get tweets that have gone up since we last looked.
                 var tweets = service.ListTweetsOnUserTimeline(new ListTweetsOnUserTimelineOptions()
                 {
                     ScreenName = "SnowIsEveryword",
@@ -229,6 +225,7 @@ namespace WhatIsSnowBot
                     TrimUser = true,
                     SinceId = AllTweets.Last().Id
                 });
+                // Get tweets older than we have in our records.  This will eventally dry up.
                 tweets = tweets.Union(service.ListTweetsOnUserTimeline(new ListTweetsOnUserTimelineOptions()
                 {
                     ScreenName = "SnowIsEveryword",
@@ -236,6 +233,22 @@ namespace WhatIsSnowBot
                     TrimUser = true,
                     MaxId = AllTweets.First().Id
                 }));
+
+                {
+                    // Slowly Trawl back through older tweets, seeing if we missed some in the middle.
+                    if (LatestRetrievedTweetThisSession < 1)
+                        LatestRetrievedTweetThisSession = AllTweets.Last().Id;
+                    var Regrab = service.ListTweetsOnUserTimeline(new ListTweetsOnUserTimelineOptions()
+                    {
+                        ScreenName = "SnowIsEveryword",
+                        Count = 200,
+                        TrimUser = true,
+                        MaxId = LatestRetrievedTweetThisSession
+                    });
+                    LatestRetrievedTweetThisSession = Regrab.Last().Id;
+
+                    tweets = tweets.Union(Regrab);
+                }
                 return tweets;
                 
             }
