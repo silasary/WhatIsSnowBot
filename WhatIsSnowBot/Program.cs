@@ -107,9 +107,7 @@ namespace WhatIsSnowBot
                 History.AddRange(matches);
             }
 
-            AllTweets = GetTweets().Union(AllTweets)
-                .OrderBy(t => t.Id)
-                .ToArray();
+            GetTweets();
             LoadRoundTimerFromDisk();
             Save();
         NextRound:
@@ -140,9 +138,12 @@ namespace WhatIsSnowBot
                 {
                     Console.WriteLine($" Sleeping 1 hour of {diff.TotalHours}");
                     Thread.Sleep(OneHour);
-                    AllTweets = GetTweets().Union(AllTweets)
-                        .OrderBy(t => t.Id)
-                        .ToArray();
+                    GetTweets();
+                    if (DateTime.Now.Subtract(LastRecount).TotalHours > 2)
+                    {
+                        Recount();
+                        LastRecount = DateTime.Now;
+                    }
                 }
                 else
                 {
@@ -213,7 +214,7 @@ namespace WhatIsSnowBot
             }
         }
 
-        private static IEnumerable<TwitterStatus> GetTweets()
+        private static void GetTweets()
         {
             if (AllTweets.Any())
             {
@@ -249,12 +250,20 @@ namespace WhatIsSnowBot
 
                     tweets = tweets.Union(Regrab);
                 }
-                return tweets;
-                
+
+                var oldnum = AllTweets.Count();
+                AllTweets = tweets.Union(AllTweets)
+                .OrderBy(t => t.Id)
+                .ToArray();
+
+                Console.WriteLine($"Tweets before Update: {oldnum}");
+                Console.WriteLine($"Tweets after Update:  {AllTweets.Count()}");
+                Console.WriteLine($"Diff: {AllTweets.Count() - oldnum}");
+
             }
             else
             {
-                return service.ListTweetsOnUserTimeline(new ListTweetsOnUserTimelineOptions() { ScreenName = "SnowIsEveryword", Count = 1000, TrimUser = true });
+                AllTweets = service.ListTweetsOnUserTimeline(new ListTweetsOnUserTimelineOptions() { ScreenName = "SnowIsEveryword", Count = 1000, TrimUser = true }).ToArray();
             }
         }
 
