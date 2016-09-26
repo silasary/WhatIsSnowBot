@@ -29,7 +29,7 @@ namespace WhatIsSnowBot
         private static readonly TimeSpan OneMinute = new TimeSpan(0,1,0);
 
         private static Random rand = new Random();
-        public static DateTime LastRecount;
+        public static DateTime LastRecount = new DateTime();
         private static long LatestRetrievedTweetThisSession = -1;
         
 
@@ -246,9 +246,11 @@ namespace WhatIsSnowBot
                         TrimUser = true,
                         MaxId = LatestRetrievedTweetThisSession
                     });
-                    LatestRetrievedTweetThisSession = Regrab.Last().Id;
-
-                    tweets = tweets.Union(Regrab);
+                    if (Regrab.Any())
+                    {
+                        LatestRetrievedTweetThisSession = Regrab.LastOrDefault().Id;
+                        tweets = tweets.Union(Regrab);
+                    }
                 }
 
                 var oldnum = AllTweets.Count();
