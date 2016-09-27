@@ -197,6 +197,8 @@ namespace WhatIsSnowBot
                 Console.WriteLine(status);
                 service.SendTweet(new SendTweetOptions() { InReplyToStatusId = match.Announcement, Status = status });
             }
+
+            match.LastRecounted = DateTime.Now.Ticks;
         }
 
         private static void LoadRoundTimerFromDisk()
