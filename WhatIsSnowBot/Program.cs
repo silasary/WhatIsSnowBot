@@ -26,7 +26,7 @@ namespace WhatIsSnowBot
 
         public static TimeSpan RoundDuration = new TimeSpan(11, 59, 0);
         private static readonly TimeSpan OneHour = new TimeSpan(1,0,0);
-        private static readonly TimeSpan OneMinute = new TimeSpan(0,1,0);
+        private static readonly TimeSpan ThirtySeconds = new TimeSpan(0,0,30);
 
         private static Random rand = new Random();
         public static DateTime LastRecount = new DateTime();
@@ -129,7 +129,7 @@ namespace WhatIsSnowBot
                 Console.WriteLine($"> {Announcement.Text}");
             }
             var age = DateTime.UtcNow.Subtract(Announcement.CreatedDate);
-            var TimeBetweenRounds = OneMinute; //new TimeSpan(RoundDuration.Ticks / 10);
+            var TimeBetweenRounds = ThirtySeconds; //new TimeSpan(RoundDuration.Ticks / 10);
 
             while (age.TotalSeconds < (RoundDuration.TotalSeconds - TimeBetweenRounds.TotalSeconds))
             {
@@ -138,9 +138,9 @@ namespace WhatIsSnowBot
                 {
                     Console.WriteLine($" Sleeping 1 hour of {diff.TotalHours}");
                     Thread.Sleep(OneHour);
-                    GetTweets();
                     if (DateTime.Now.Subtract(LastRecount).TotalHours > 2)
                     {
+                        GetTweets();
                         Recount();
                         LastRecount = DateTime.Now;
                     }
@@ -157,17 +157,18 @@ namespace WhatIsSnowBot
             Save();
 
 
+            GetTweets();
             Console.WriteLine($" Sleeping {TimeBetweenRounds.ToString()}");
             Thread.Sleep(TimeBetweenRounds);
-            if (DateTime.Now.Subtract(LastRecount).TotalHours > 12)
+            if (DateTime.Now.Subtract(LastRecount).TotalHours > 6)
             {
                 Recount();
                 LastRecount = DateTime.Now;
             }
             if (RoundDuration.TotalMinutes >= 60 && DateTime.Now.Minute != 0)
             {
-                Console.WriteLine($" Sleeping {OneMinute.ToString()}");
-                Thread.Sleep(OneMinute);
+                Console.WriteLine($" Sleeping {ThirtySeconds.ToString()}");
+                Thread.Sleep(ThirtySeconds);
             }
 
             goto NextRound;
@@ -250,7 +251,7 @@ namespace WhatIsSnowBot
                     });
                     if (Regrab.Any())
                     {
-                        LatestRetrievedTweetThisSession = Regrab.LastOrDefault().Id;
+                        LatestRetrievedTweetThisSession = Regrab.LastOrDefault().Id -1;
                         tweets = tweets.Union(Regrab);
                     }
                 }
